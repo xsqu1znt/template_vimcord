@@ -1,0 +1,62 @@
+{
+    "ts-node": {
+        "files": true,
+        "esm": true
+    },
+
+    "include": ["./src/**/*.ts"],
+    "exclude": ["./node_modules", "./dist"],
+
+    "compilerOptions": {
+        // File Layout
+        "rootDir": "./src",
+        "outDir": "./dist",
+
+        // Environment Settings
+        "module": "commonjs",
+        "target": "ES2022",
+        "moduleResolution": "node",
+        "types": ["node"],
+
+        // Other Outputs
+        "declaration": true,
+
+        // Stricter Typechecking Options
+        "noUncheckedIndexedAccess": true,
+
+        // Style Options
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noFallthroughCasesInSwitch": true,
+        "forceConsistentCasingInFileNames": true,
+
+        // Recommended Options
+        "strict": true,
+        "isolatedModules": true,
+        "noUncheckedSideEffectImports": true,
+        "moduleDetection": "force",
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "skipLibCheck": true,
+
+        "paths": {
+            "@/*": ["./src/*"],
+
+            "@commands/*": ["./src/commands/*"],
+            "@slashCommands/*": ["./src/commands/slash/*"],
+            "@prefixCommands/*": ["./src/commands/prefix/*"],
+            "@contextCommands/*": ["./src/commands/context/*"],
+
+            "@events/*": ["./src/events/*"],
+            "@jobs/*": ["./src/jobs/*"],
+
+            "@db/*": ["./src/db/*"],
+            "@features/*": ["./src/features/*"],
+            "@utils/*": ["./src/utils/*"],
+
+            "@constants/*": ["./src/constants"],
+            "@ctypes/*": ["./src/types/*"]
+        }
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "Event": {
+        "scope": "typescript",
+        "prefix": "vEvent",
+        "description": "An event template for Vimcord",
+        "body": [
+            "import { EventBuilder } from \"vimcord\";",
+            "",
+            "export default new EventBuilder({",
+            "    event: \"${1}\",",
+            "    name: \"${2:${TM_FILENAME_BASE/(.*)\\.event/${1:/capitalize}/}}\",",
+
+            "",
+
+            "    async execute(client, ${3:args}) {",
+            "        ${0}",
+            "    }",
+            "});"
+        ]
+    }
+}

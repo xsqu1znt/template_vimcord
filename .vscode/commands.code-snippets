@@ -1,0 +1,56 @@
+{
+    "Prefix Command": {
+        "scope": "typescript",
+        "prefix": "vPrefixCommand",
+        "description": "A prefix command template for Vimcord",
+        "body": [
+            "import { PrefixCommandBuilder } from \"vimcord\";\n",
+
+            "export default new PrefixCommandBuilder({",
+            "    name: \"${1:${TM_FILENAME_BASE/(.*)\\.prefix/${1:/downcase}/}}\",",
+            "    description: \"${2}\",\n",
+
+            "   async execute(client, message) {",
+            "       ${0:// Reply to the message\n        return message.reply({ content: \"Hello world!\" \\});}",
+            "   }",
+            "});"
+        ]
+    },
+    "Slash Command": {
+        "scope": "typescript",
+        "prefix": "vSlashCommand",
+        "description": "A slash command template for Vimcord",
+        "body": [
+            "import { InteractionContextType } from \"discord.js\";",
+            "import { SlashCommandBuilder } from \"vimcord\";\n",
+
+            "export default new SlashCommandBuilder({",
+            "    builder: builder => builder.setName(\"${1:${TM_FILENAME_BASE/(.*)\\.slash/${1:/downcase}/}}\").setDescription(\"${2}\").setContexts(InteractionContextType.Guild),\n",
+
+            "    deferReply: true,\n",
+
+            "   async execute(client, interaction) {",
+            "       ${0:// Reply to the interaction\n        return interaction.editReply({ content: \"Hello world!\" \\});}",
+            "   }",
+            "});"
+        ]
+    },
+
+    "Context Command": {
+        "scope": "typescript",
+        "prefix": "vContextCommand",
+        "description": "A context command template for Vimcord",
+        "body": [
+            "import { ApplicationCommandType, InteractionContextType } from \"discord.js\";",
+            "import { ContextCommandBuilder } from \"vimcord\";\n",
+
+            "export default new ContextCommandBuilder({",
+            "    builder: builder => builder.setName(\"${1:${TM_FILENAME_BASE/(.*)\\.ctx/${1:/downcase}/}}\").setContexts(InteractionContextType.Guild).setType(ApplicationCommandType.${2|User,Message|}),\n",
+
+            "   async execute(client, interaction) {",
+            "       ${0:// Reply to the interaction\n        return interaction.editReply({ content: \"Hello world!\" \\});}",
+            "   }",
+            "});"
+        ]
+    }
+}

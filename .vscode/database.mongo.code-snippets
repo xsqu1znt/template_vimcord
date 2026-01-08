@@ -1,0 +1,46 @@
+{
+    "Mongo Schema": {
+        "scope": "typescript",
+        "prefix": "vMongoSchema",
+        "description": "A MongoSchema template for Vimcord",
+        "body": [
+            "import { createMongoSchema } from \"vimcord\";\n",
+
+            "export interface I${1:${TM_FILENAME_BASE/(.*)\\.schema/${1:/capitalize}/}} {",
+            "    ${3:// types}",
+            "    createdAt: number;",
+            "}\n",
+
+            "export const ${1}Schema = createMongoSchema<I${1}>(\"${2:${1}s}\", {",
+            "    ${0:// schema}",
+            "    createdAt: { type: Number, default: Date.now }",
+            "});"
+        ]
+    },
+
+    "Extended Mongo Schema": {
+        "scope": "typescript",
+        "prefix": "vExtendedMongoSchema",
+        "description": "An extended MongoSchema template for Vimcord ",
+        "body": [
+            "import { createMongoSchema } from \"vimcord\";\n",
+
+            "export interface I${1:${TM_FILENAME_BASE/(.*)\\.schema/${1:/capitalize}/}} {",
+            "    ${3:// types}",
+            "    sampleId: string;",
+            "    createdAt: number;",
+            "}\n",
+
+            "export const ${1}Schema = createMongoSchema<I${1}>(\"${2:${1}s}\", {",
+            "    ${4:// schema}",
+            "    sampleId: { type: String, unique: true, required: true },",
+            "    createdAt: { type: Number, default: Date.now }",
+            "}).extend({",
+            "    ${0:// custom functions}",
+            "    async getById(id: string) {",
+            "        return await this.fetch({ sampleId: id });",
+            "    }",
+            "})"
+        ]
+    }
+}

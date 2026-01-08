@@ -1,0 +1,32 @@
+{
+    "name": "template-vimcord",
+    "version": "1.0.0",
+    "author": "",
+    "main": "dist/index.js",
+    "license": "MIT",
+    "private": true,
+    "packageManager": "pnpm@10.27.0",
+    "scripts": {
+        "start": "node dist/index.js",
+        "dev": "nodemon --exec \"tsx src/index.ts --dev\" -w src -w config -e \"json ts\"",
+        "build": "rm -rf dist && tsc && tsc-alias",
+        "check": "tsc --noEmit",
+        "format": "prettier --write \"./**/*.{ts,json}\""
+    },
+    "devDependencies": {
+        "@types/node": "^25.0.3",
+        "nodemon": "^3.1.11",
+        "prettier": "^3.7.4",
+        "tsc-alias": "^1.8.16",
+        "tsx": "^4.21.0",
+        "type-fest": "^5.3.1",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "axios": "^1.13.2",
+        "discord.js": "^14.25.1",
+        "mongoose": "^9.1.2",
+        "qznt": "^1.0.34",
+        "vimcord": "^1.0.21"
+    }
+}
