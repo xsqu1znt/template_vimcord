@@ -18,11 +18,11 @@ importers:
         specifier: ^9.1.2
         version: 9.1.2
       qznt:
-        specifier: ^1.0.34
-        version: 1.0.34
+        specifier: ^1.0.35
+        version: 1.0.35
       vimcord:
-        specifier: ^1.0.21
-        version: 1.0.21(discord.js@14.25.1)(mongoose@9.1.2)
+        specifier: ^1.0.22
+        version: 1.0.22(discord.js@14.25.1)(mongoose@9.1.2)
     devDependencies:
       '@types/node':
         specifier: ^25.0.3
@@ -631,8 +631,8 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
-  qznt@1.0.34:
-    resolution: {integrity: sha512-w/eo6OaXpHYBHqXuHtjaVxIFKdtazQLdmuClcnRvEJ/oY8JTDZzP1oZ1wYKMlZqG5UD9pqoiefKaHtlDyanh5A==}
+  qznt@1.0.35:
+    resolution: {integrity: sha512-ToqJYK1qVLkfdSpp9V8gEq5CyUtmh3twE8MP9kUlXcsbuvb7ZnPdRuLFk/9EVRgoT+gE+WupvWcqvnRSzb4Avw==}
 
   readdirp@3.6.0:
     resolution: {integrity: sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==}
@@ -730,8 +730,8 @@ packages:
     resolution: {integrity: sha512-gBLkYIlEnSp8pFbT64yFgGE6UIB9tAkhukC23PmMDCe5Nd+cRqKxSjw5y54MK2AZMgZfJWMaNE4nYUHgi1XEOw==}
     engines: {node: '>=18.17'}
 
-  vimcord@1.0.21:
-    resolution: {integrity: sha512-o4AJtwCzcvDt1sD+zNCqQ/mRZDBHXNFFlonoWUWZVuYA9s8yqotQzpQjDpKmOklAnAmb/atp9B/hPq1OqzYTSQ==}
+  vimcord@1.0.22:
+    resolution: {integrity: sha512-Py3lTjOtfp5W1TZCmf5SrTYNjYJ9020R7bz+eHi9dJz3gwEBxc/W1L7lCum0EqefV6fhQnSHfYs8UstUUNyLvA==}
     peerDependencies:
       discord.js: ^14.0.0
       mongoose: ^8.0.0
@@ -1288,7 +1288,7 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  qznt@1.0.34: {}
+  qznt@1.0.35: {}
 
   readdirp@3.6.0:
     dependencies:
@@ -1371,7 +1371,7 @@ snapshots:
 
   undici@6.21.3: {}
 
-  vimcord@1.0.21(discord.js@14.25.1)(mongoose@9.1.2):
+  vimcord@1.0.22(discord.js@14.25.1)(mongoose@9.1.2):
     dependencies:
       axios: 1.13.2
       chalk: 4.1.2
@@ -1379,7 +1379,7 @@ snapshots:
       dotenv: 16.6.1
       lodash: 4.17.21
       node-cron: 4.2.1
-      qznt: 1.0.34
+      qznt: 1.0.35
       type-fest: 4.41.0
     optionalDependencies:
       mongoose: 9.1.2
