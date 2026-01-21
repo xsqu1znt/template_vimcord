@@ -12,6 +12,4 @@ export const GuildSchema = createMongoSchema<IGuild>("Guilds", {
     createdAt: { type: Number, default: Date.now }
 });
 
-GuildSchema.execute(() => {
-    GuildSchema.schema.index({ guildId: 1, prefix: 1 }, { unique: true });
-});
+GuildSchema.schema.index({ guildId: 1, prefix: 1 }, { unique: true });
