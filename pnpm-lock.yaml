@@ -21,8 +21,8 @@ importers:
         specifier: ^1.0.35
         version: 1.0.35
       vimcord:
-        specifier: ^1.0.26
-        version: 1.0.26(discord.js@14.25.1)(mongoose@9.1.5)
+        specifier: ^1.0.27
+        version: 1.0.27(discord.js@14.25.1)(mongoose@9.1.5)
     devDependencies:
       '@types/node':
         specifier: ^25.0.9
@@ -730,8 +730,8 @@ packages:
     resolution: {integrity: sha512-gBLkYIlEnSp8pFbT64yFgGE6UIB9tAkhukC23PmMDCe5Nd+cRqKxSjw5y54MK2AZMgZfJWMaNE4nYUHgi1XEOw==}
     engines: {node: '>=18.17'}
 
-  vimcord@1.0.26:
-    resolution: {integrity: sha512-zjwnsvB0Hp/1O+kOX9aMSQOeIypL8xAEfkLt3kiJxdP4ZKnLvquog3fHl4uWcyc3DN6kVw0rJRE9g/WB4gkbAQ==}
+  vimcord@1.0.27:
+    resolution: {integrity: sha512-MohV8VUDgeIbg1h8JyrYsNDqEpzDmHZ8tV1MaCE1CWX+RuWk8r8pbPscJE3kg9zX5/MBx134++fslJC5Pt7H0w==}
     peerDependencies:
       discord.js: ^14.0.0
       mongoose: ^8.0.0
@@ -1371,7 +1371,7 @@ snapshots:
 
   undici@6.21.3: {}
 
-  vimcord@1.0.26(discord.js@14.25.1)(mongoose@9.1.5):
+  vimcord@1.0.27(discord.js@14.25.1)(mongoose@9.1.5):
     dependencies:
       axios: 1.13.2
       chalk: 4.1.2
