@@ -6,7 +6,9 @@
 
 This is a Discord bot template using TypeScript, Vimcord framework, and MongoDB. The bot uses slash commands, prefix commands, and event handlers.
 
+Keep this up-to-date with any new structural changes or new project specific guidelines.
 For deep-dive patterns and API references beyond what this file covers, see [DOCS.md](./DOCS.md).
+For more information on API usage, look up documentation online for the following packages: discord.js, MongoDB, mongoose.
 
 ---
 
@@ -110,9 +112,8 @@ import { SomeUtil } from "../../../utils/some.util";
 
 ### Type Safety
 
-- **Never use `any`** - Use `unknown` with type guards instead
+- **Never use `any`** - Use `unknown` with type guards only when necessary instead
 - **Use explicit return types** for functions
-- **Use `satisfies`** for shape validation
 
 ### Function Signatures
 
@@ -156,13 +157,12 @@ Use `console.log` for general logging — Vimcord intercepts and formats these i
 
 ```
 constants/                    # Static JSON configuration (outside src for hot reloading)
-├── example.config.json       # JSON files imported into src/constants.ts
+├── config.json               # JSON files imported into src/constants.ts
 src/
-├── index.ts                  # Bot entry point
-├── bot.ts                    # Bot factory (createBot function)
+├── index.ts                  # Bot entry point (client creation, configuration, start)
 ├── constants.ts              # Re-exports constants from ../constants/*.json
 ├── db/
-│   ├── index.ts              # Database exports
+│   ├── index.ts              # Database schema exports (barrel file)
 │   └── schemas/              # Mongoose schemas (*.schema.ts)
 ├── commands/
 │   ├── slash/                # Slash commands (*.slash.ts)
@@ -170,7 +170,7 @@ src/
 │   └── context/              # Context menu commands (*.ctx.ts)
 ├── events/                   # Event handlers (*.event.ts)
 ├── jobs/                     # Scheduled jobs
-├── features/                 # Vimcord feature configurations
+├── features/                 # Feature classes (complex business logic)
 ├── utils/                    # Utility functions
 └── types/                    # TypeScript type definitions
 ```
@@ -200,39 +200,119 @@ export const EMOJIS = _emojis;
 import { EMOJIS } from "@/constants";
 ```
 
+### About the events/ Directory
+
+Events can be organized by type in subdirectories for better discoverability:
+
+| Subdirectory   | Purpose                         | Example                          |
+| -------------- | ------------------------------- | -------------------------------- |
+| `interaction/` | Autocomplete, button collectors | `autocomplete.cards.event.ts`    |
+| `intervals/`   | Periodic polling/checks         | `interval.autoReminder.event.ts` |
+| `presence/`    | User presence updates           | `presence.vanity.event.ts`       |
+| `state/`       | Client lifecycle events         | `state.restarted.event.ts`       |
+
+### About the jobs/ Directory
+
+Scheduled jobs use cron patterns for recurring tasks:
+
+- `_BaseCronJob.ts` - Abstract base class with singleton pattern
+- `*.job.ts` - Individual job implementations
+- `index.ts` - Initialization function called on client ready
+
+```typescript
+// Example job implementation
+export class Backups extends _BaseCronJob {
+    constructor() {
+        super("0 0 */6 * * *", false); // Every 6 hours
+    }
+
+    async execute(): Promise<void> {
+        // Job logic here
+    }
+}
+```
+
+### About the features/ Directory
+
+Feature classes encapsulate complex business logic that spans multiple commands. Use feature classes when:
+
+- Logic is shared across multiple commands
+- State needs to be maintained during an operation
+- Business rules are complex and deserve their own test suite
+
 ---
 
 ## Quick Reference
 
 ### Creating a Slash Command
 
-Key points: use `VimcordSlashCommandBuilder`, set a `metadata.category`, implement `execute(client, interaction)`.
+Key points: use builder function pattern, set `metadata.category`, use `deferReply` for longer operations.
 
 ```typescript
-import { InteractionContextType, SlashCommandBuilder } from "discord.js";
-import { SlashCommandBuilder as VimcordSlashCommandBuilder } from "vimcord";
+import { InteractionContextType } from "discord.js";
+import { SlashCommandBuilder } from "vimcord";
 
-export default new VimcordSlashCommandBuilder({
-    builder: new SlashCommandBuilder()
-        .setName("command-name")
-        .setDescription("Description here")
-        .setContexts(InteractionContextType.Guild),
+export default new SlashCommandBuilder({
+    builder: builder =>
+        builder.setName("command-name").setDescription("Description here").setContexts(InteractionContextType.Guild),
 
+    deferReply: true,
     metadata: { category: "Category/Name" },
 
     async execute(client, interaction): Promise<void> {
-        // Your code here
+        await interaction.editReply("Response");
     }
+});
+```
+
+### Creating a Staff Command
+
+```typescript
+import { SlashCommandBuilder } from "vimcord";
+
+export default new SlashCommandBuilder({
+    builder: builder => builder.setName("admin").setDescription("Admin command (STAFF)"),
+
+    deferReply: true,
+    permissions: { guildOnly: true, botStaffOnly: true },
+    metadata: { category: "Staff" },
+
+    async execute(client, interaction): Promise<void> {
+        // Only bot staff can reach here
+    }
+});
+```
+
+### Creating a Command with Subcommand Routes
+
+```typescript
+import { SlashCommandBuilder } from "vimcord";
+import subAdd from "./subcommand/add";
+import subDelete from "./subcommand/delete";
+
+export default new SlashCommandBuilder({
+    builder: builder =>
+        builder
+            .setName("card")
+            .setDescription("Card management")
+            .addSubcommand(sub => sub.setName("add").setDescription("Add a card"))
+            .addSubcommand(sub => sub.setName("delete").setDescription("Delete a card")),
+
+    deferReply: true,
+    routes: [
+        { name: "add", handler: (client, interaction) => subAdd(interaction) },
+        { name: "delete", handler: (client, interaction) => subDelete(interaction) }
+    ]
 });
 ```
 
 ### Creating an Event Handler
 
-Key points: use `EventBuilder`, provide a unique dot-namespaced `name`, implement `execute`.
+Key points: use `EventBuilder`, provide unique dot-namespaced `name`, implement `execute`.
 
 ```typescript
-import { EventBuilder } from "vimcord";
 import { Events } from "discord.js";
+import { EventBuilder } from "vimcord";
 
 export default new EventBuilder({
     event: Events.Ready,
@@ -244,45 +324,92 @@ export default new EventBuilder({
 });
 ```
 
-### Client Setup Pattern
-
-> **Note:** The `GatewayIntentBits` values below are illustrative. Your bot's required intents depend on the features it uses — refer to the Discord developer docs and add only the intents your bot actually needs.
+### Creating an Environment-Specific Event
 
 ```typescript
-// src/bot.ts
-import { GatewayIntentBits } from "discord.js";
-import { createClient, Vimcord } from "vimcord";
+import { Events } from "discord.js";
+import { EventBuilder } from "vimcord";
 
-export function createBot(): Vimcord {
-    return createClient(
-        {
-            // Add only the intents your bot requires
-            intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
-        },
-        {
-            useDefaultSlashCommandHandler: true,
-            useDefaultPrefixCommandHandler: true,
-            useGlobalErrorHandlers: true,
-            importModules: {
-                events: "./events",
-                slashCommands: "./commands/slash",
-                prefixCommands: "./commands/prefix"
-            }
-        }
-    );
-}
+export default new EventBuilder({
+    event: Events.PresenceUpdate,
+    name: "Presence.Vanity",
+    deployment: { environments: ["production"] }, // Only in production
 
+    async execute(client, oldPresence, newPresence): Promise<void> {
+        // Handle presence update
+    }
+});
+```
+
+### Client Setup Pattern
+
+```typescript
 // src/index.ts
-import { createBot } from "./bot";
+import {
+    createClient,
+    defineClientOptions,
+    defineVimcordFeatures,
+    defineGlobalToolsConfig,
+    MongoDatabase,
+    StatusType
+} from "vimcord";
+import { GatewayIntentBits, ActivityType } from "discord.js";
+import { initializeJobs } from "./jobs";
 
-async function main(): Promise<void> {
-    const client = createBot();
-    client.useEnv();
-    client.configure("app", { name: "MyBot" });
-    await client.start();
-}
+// Global tools configuration
+defineGlobalToolsConfig({
+    embedColor: ["#5865F2", "#57F287"],
+    paginator: {
+        notAParticipantMessage: "These buttons aren't for you."
+    }
+});
 
-main().catch(console.error);
+// Define client options
+const clientOptions = defineClientOptions({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+});
+
+// Define features
+const vimcordFeatures = defineVimcordFeatures({
+    useGlobalErrorHandlers: true,
+    useDefaultSlashCommandHandler: true,
+    useDefaultPrefixCommandHandler: true,
+    importModules: {
+        events: "./events",
+        slashCommands: "./commands/slash",
+        prefixCommands: "./commands/prefix"
+    }
+});
+
+// Create client
+const client = createClient(clientOptions, vimcordFeatures);
+
+client.useEnv();
+client.useDatabase(new MongoDatabase(client));
+
+client
+    .configure("app", { name: "MyBot", verbose: false })
+    .configure("staff", {
+        ownerId: "BOT_OWNER_ID",
+        superUsers: ["STAFF_ID_1", "STAFF_ID_2"],
+        guild: { id: "STAFF_GUILD_ID" }
+    })
+    .configure("slashCommands", {
+        async beforeExecute(client, interaction) {
+            // Runs before every slash command
+        },
+        async afterExecute(result, client, interaction) {
+            // Runs after every slash command
+        }
+    });
+
+// Start with callback
+client.start(() => {
+    client.status.set({
+        production: { activity: { name: "Online", type: ActivityType.Playing } }
+    });
+    initializeJobs(client);
+});
 ```
 
 ---
@@ -290,6 +417,14 @@ main().catch(console.error);
 ## Additional Notes
 
 - The bot uses environment variables via `client.useEnv()` method
-- MongoDB connection configured in `src/db/`
-- Default command prefix is `!`
+- MongoDB connection configured in `src/db/` - use `client.useDatabase(new MongoDatabase(client))` before `client.start()`
+- Database schemas use `createMongoSchema<T>()` with TypeScript interfaces for type safety
+- Use `Schema.extend({ method1, method2 })` to add custom methods to schemas
+- Use `Schema.useTransaction(async session => { ... })` for atomic operations
+- Default command prefix is configurable via `.configure("prefixCommands", { defaultPrefix: "?" })`
 - Development mode is auto-detected from `NODE_ENV` or `--dev` flag
+- Staff permissions use `permissions: { botStaffOnly: true }` which checks `ownerId` and `superUsers`
+- Use the builder function pattern: `builder: builder => builder.setName(...)`
+- Always use `deferReply: true` for commands that may take longer than 3 seconds
+- Organize events by type in subdirectories: `interaction/`, `intervals/`, `presence/`, `state/`
+- Feature classes in `src/features/` encapsulate complex business logic shared across commands

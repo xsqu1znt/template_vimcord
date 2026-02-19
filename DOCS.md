@@ -71,6 +71,330 @@ Vimcord merges configuration in this priority order (later overrides earlier):
 
 ---
 
+## Client Configuration
+
+### Type-Safe Configuration Factories
+
+Vimcord provides factory functions for type-safe client configuration:
+
+```typescript
+import { createClient, defineClientOptions, defineVimcordFeatures, defineGlobalToolsConfig, StatusType } from "vimcord";
+import { GatewayIntentBits, ActivityType } from "discord.js";
+
+// Define Discord.js client options
+const clientOptions = defineClientOptions({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.MessageContent
+    ]
+});
+
+// Define Vimcord features
+const vimcordFeatures = defineVimcordFeatures({
+    useGlobalErrorHandlers: true,
+    useDefaultSlashCommandHandler: true,
+    useDefaultPrefixCommandHandler: true,
+    useDefaultContextCommandHandler: true,
+
+    // Show error message to users when commands fail
+    enableCommandErrorMessage: {
+        inviteButtonLabel: "Support Server",
+        inviteUrl: "https://discord.gg/your-invite"
+    },
+
+    // Auto-import modules
+    importModules: {
+        events: "./events",
+        slashCommands: "./commands/slash",
+        prefixCommands: "./commands/prefix",
+        contextCommands: "./commands/context"
+    }
+});
+
+// Create client with type-safe options
+const client = createClient(clientOptions, vimcordFeatures);
+```
+
+### Global Tools Configuration
+
+Configure tools globally to avoid repeating options:
+
+```typescript
+import { defineGlobalToolsConfig, PaginationType } from "vimcord";
+
+defineGlobalToolsConfig({
+    // Default embed colors (randomly selected)
+    embedColor: ["#5865F2", "#57F287", "#FEE75C", "#EB459E"],
+    embedColorDev: ["#FF0000"], // Dev mode colors
+
+    // Paginator configuration
+    paginator: {
+        notAParticipantMessage: "These buttons aren't for you.",
+        buttons: {
+            first: { label: "", emoji: { name: "⏪", id: null } },
+            back: { label: "", emoji: { name: "◀️", id: null } },
+            next: { label: "", emoji: { name: "▶️", id: null } },
+            last: { label: "", emoji: { name: "⏩", id: null } }
+        }
+    }
+});
+```
+
+### Configuration Methods
+
+Chain multiple `configure()` calls:
+
+```typescript
+client
+    // App configuration
+    .configure("app", {
+        name: "MyBot",
+        verbose: false
+    })
+    // Staff configuration
+    .configure("staff", {
+        ownerId: "123456789",
+        superUsers: ["111222333", "444555666"], // Additional staff
+        guild: {
+            id: "987654321",
+            inviteUrl: "https://discord.gg/invite",
+            channels: {
+                staffSpam: "123456789"
+            }
+        }
+    })
+    // Slash command hooks
+    .configure("slashCommands", {
+        async beforeExecute(client, interaction) {
+            // Runs before every slash command
+            await UserSchema.update({ userId: interaction.user.id }, { lastActive: new Date() }, { upsert: true });
+        },
+        async afterExecute(result, client, interaction) {
+            // Runs after every slash command
+            await logCommandUsage(interaction);
+        }
+    })
+    // Prefix command configuration
+    .configure("prefixCommands", {
+        defaultPrefix: "!",
+        async guildPrefixResolver(client, guildId) {
+            // Dynamic prefix per guild
+            const guildData = await GuildSchema.fetch({ guildId }, { prefix: 1 });
+            return guildData?.prefix;
+        }
+    });
+```
+
+### Status Configuration
+
+```typescript
+client.start(() => {
+    client.status.set({
+        production: {
+            activity: {
+                name: "with code",
+                type: ActivityType.Playing,
+                status: StatusType.Online
+            }
+        },
+        development: {
+            interval: 15,
+            randomize: true,
+            activity: [
+                { name: "Dev Mode", type: ActivityType.Custom, status: StatusType.DND },
+                { name: "Testing", type: ActivityType.Custom, status: StatusType.Idle }
+            ]
+        }
+    });
+});
+```
+
+---
+
+## BetterCollector
+
+Enhanced interaction collector with participant tracking and timeout handling:
+
+```typescript
+import { BetterCollector, CollectorTimeoutType } from "vimcord";
+import { ComponentType, ButtonStyle, ButtonBuilder, ActionRowBuilder } from "discord.js";
+
+const message = await interaction.editReply({
+    content: "Choose an option:",
+    components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder({ customId: "btn_yes", label: "Yes", style: ButtonStyle.Success }),
+            new ButtonBuilder({ customId: "btn_no", label: "No", style: ButtonStyle.Danger })
+        )
+    ]
+});
+
+const collector = new BetterCollector(message, {
+    type: ComponentType.Button,
+    participants: [interaction.user], // Only these users can interact
+    idle: 60_000,
+    onTimeout: CollectorTimeoutType.DisableComponents
+});
+
+// Lock tracking for async operations
+const pendingRequests = new Set<string>();
+
+// General listener (runs for all interactions)
+collector.on(async i => {
+    if (pendingRequests.has(i.user.id)) {
+        return i.reply({ content: "Please wait...", flags: "Ephemeral" });
+    }
+});
+
+// Specific button handlers
+collector
+    .on(
+        "btn_yes",
+        async i => {
+            pendingRequests.add(i.user.id);
+            await i.deferReply();
+
+            await doSomething();
+            await i.editReply({ content: "Done!" });
+        },
+        {
+            finally: i => pendingRequests.delete(i.user.id)
+        }
+    )
+    .on(
+        "btn_no",
+        async i => {
+            await i.reply({ content: "Cancelled", flags: "Ephemeral" });
+        },
+        {
+            defer: { update: true }
+        }
+    );
+```
+
+### CollectorTimeoutType Options
+
+| Value               | Behavior                          |
+| ------------------- | --------------------------------- |
+| `DisableComponents` | Disable all buttons after timeout |
+| `ClearComponents`   | Remove all buttons after timeout  |
+| `DeleteMessage`     | Delete the message after timeout  |
+| `DoNothing`         | Leave message as-is               |
+
+---
+
+## BetterContainer (V2 Components)
+
+Build Discord V2 component layouts:
+
+```typescript
+import { BetterContainer } from "vimcord";
+import { ButtonStyle } from "discord.js";
+
+const container = new BetterContainer()
+    // Add text content
+    .addText(["## Welcome to the Shop", "Check out our daily deals!"])
+    // Add media (image)
+    .addMedia({ url: "https://example.com/banner.png" })
+    // Add visual separator
+    .addSeparator({ divider: true, spacing: 2 })
+    // Add section with button
+    .addSection({
+        text: ["**Premium Card**", "-# Price: 1000 Mingcoins"],
+        thumbnail: { media: { url: card.imageUrl } },
+        button: {
+            customId: "btn_buy:card123",
+            label: "Buy Now",
+            style: ButtonStyle.Primary
+        }
+    })
+    .addSeparator({ divider: true })
+    // Another section
+    .addSection({
+        text: "Regular Item - 500 coins",
+        button: {
+            customId: "btn_buy:item456",
+            label: "Purchase",
+            style: ButtonStyle.Secondary
+        }
+    });
+
+// Send the container
+await container.send(interaction);
+```
+
+### Container Methods
+
+| Method                                      | Description                        |
+| ------------------------------------------- | ---------------------------------- |
+| `addText(content)`                          | Add text content (string or array) |
+| `addMedia({ url })`                         | Add image/media                    |
+| `addSeparator({ divider, spacing })`        | Add visual separator               |
+| `addSection({ text, button?, thumbnail? })` | Add section with optional button   |
+| `send(target)`                              | Send to interaction/channel        |
+
+---
+
+## Utility Functions
+
+### fetchMember
+
+Fetch a guild member with caching:
+
+```typescript
+import { fetchMember } from "vimcord";
+
+const member = await fetchMember(guild, userId);
+if (member) {
+    console.log(member.user.username);
+}
+```
+
+### fetchChannel
+
+Fetch a channel with type checking:
+
+```typescript
+import { fetchChannel } from "vimcord";
+import { ChannelType } from "discord.js";
+
+const channel = await fetchChannel(guild, channelId, ChannelType.GuildText);
+if (channel) {
+    await channel.send("Hello!");
+}
+```
+
+### dynaSend
+
+Universal send method that works with any Discord object:
+
+```typescript
+import { dynaSend } from "vimcord";
+
+// Works with interactions, channels, messages, users
+await dynaSend(interaction, {
+    content: "Hello!",
+    embeds: [embed],
+    files: [attachment],
+    flags: "Ephemeral"
+});
+```
+
+### \_\_zero Helper
+
+Null/undefined coercion helper:
+
+```typescript
+import { __zero } from "vimcord";
+
+// Returns value or undefined (never null)
+const guild = client.guilds.cache.get(__zero(config.guildId));
+```
+
+---
+
 ## Project Scaffolding
 
 ### Minimum Project Structure
@@ -315,70 +639,187 @@ createClient({...}, {
 
 ### Slash Commands
 
-**Basic Structure**:
+**Basic Structure (Builder Function Pattern)**:
+
+The builder function pattern (`builder => builder...`) is preferred for cleaner code:
 
 ```typescript
-import { PermissionFlagsBits, SlashCommandBuilder as DJSSlashCommandBuilder } from "discord.js";
+import { InteractionContextType } from "discord.js";
 import { SlashCommandBuilder } from "vimcord";
 
 export default new SlashCommandBuilder({
-    // Discord.js builder instance
-    builder: new DJSSlashCommandBuilder().setName("ping").setDescription("Check bot latency"),
+    // Builder function receives Discord.js SlashCommandBuilder
+    builder: builder =>
+        builder.setName("ping").setDescription("Check bot latency").setContexts(InteractionContextType.Guild),
 
-    // Optional: Auto-defer reply
+    // Auto-defer reply (prevents 3-second timeout)
     deferReply: true,
     // Or with options: deferReply: { ephemeral: true }
 
-    execute: async (client, interaction): Promise<void> => {
-        const latency = client.ws.ping;
-        await interaction.reply(`Pong! Latency: ${latency}ms`);
+    // Command metadata for help/categorization
+    metadata: { category: "General/App" },
+
+    async execute(client, interaction): Promise<void> {
+        await interaction.editReply(`Pong! Latency: ${client.ws.ping}ms`);
+    }
+});
+```
+
+**Staff-Only Command with Permissions**:
+
+```typescript
+import { InteractionContextType, PermissionFlagsBits } from "discord.js";
+import { SlashCommandBuilder } from "vimcord";
+import { BlacklistedUserSchema } from "@db/index";
+
+export default new SlashCommandBuilder({
+    builder: builder =>
+        builder
+            .setName("blacklist")
+            .setDescription("Manage blacklisted users (STAFF)")
+            .setContexts(InteractionContextType.Guild)
+            .addUserOption(option => option.setName("user").setDescription("User to blacklist").setRequired(true))
+            .addStringOption(option => option.setName("reason").setDescription("Reason for blacklist")),
+
+    deferReply: true,
+
+    permissions: {
+        guildOnly: true,
+        botStaffOnly: true // Only bot owner + superUsers
+    },
+
+    metadata: { category: "Staff" },
+
+    async execute(client, interaction): Promise<void> {
+        const user = interaction.options.getUser("user", true);
+        const reason = interaction.options.getString("reason") ?? "No reason provided";
+
+        await BlacklistedUserSchema.create([
+            {
+                userId: user.id,
+                staffId: interaction.user.id,
+                reason
+            }
+        ]);
+
+        await interaction.editReply(`Blacklisted **${user.username}**.`);
     }
 });
 ```
 
 **With Subcommand Routing**:
 
+Use `routes` to split complex commands into separate handlers:
+
 ```typescript
-import { PermissionFlagsBits, SlashCommandBuilder as DJSSlashCommandBuilder } from "discord.js";
 import { SlashCommandBuilder } from "vimcord";
+import cardAdd from "./card/add";
+import cardDelete from "./card/delete";
+import cardEdit from "./card/edit";
 
 export default new SlashCommandBuilder({
-    builder: new DJSSlashCommandBuilder()
-        .setName("moderation")
-        .setDescription("Server moderation tools.")
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-        .addSubcommand(sub =>
-            sub
-                .setName("ban")
-                .setDescription("Ban a user.")
-                .addUserOption(opt => opt.setName("user").setDescription("User to ban").setRequired(true))
-                .addStringOption(opt => opt.setName("reason").setDescription("Ban reason"))
-        )
-        .addSubcommand(sub =>
-            sub
-                .setName("kick")
-                .setDescription("Kick a user.")
-                .addUserOption(opt => opt.setName("user").setDescription("User to kick").setRequired(true))
-        ),
+    builder: builder =>
+        builder
+            .setName("card")
+            .setDescription("Card management (STAFF)")
+
+            .addSubcommand(sub =>
+                sub
+                    .setName("add")
+                    .setDescription("Add a new card")
+                    .addAttachmentOption(opt => opt.setName("image").setRequired(true))
+                    .addStringOption(opt => opt.setName("id").setRequired(true))
+            )
+            .addSubcommand(sub =>
+                sub
+                    .setName("delete")
+                    .setDescription("Delete a card")
+                    .addStringOption(opt => opt.setName("card").setAutocomplete(true).setRequired(true))
+            )
+            .addSubcommand(sub =>
+                sub
+                    .setName("edit")
+                    .setDescription("Edit a card")
+                    .addStringOption(opt => opt.setName("card").setAutocomplete(true).setRequired(true))
+            ),
+
+    deferReply: true,
+    permissions: { botStaffOnly: true },
 
     // Route subcommands to separate handlers
     routes: [
-        {
-            name: "ban",
-            handler: async (client, interaction): Promise<void> => {
-                const user = interaction.options.getUser("user", true);
-                const reason = interaction.options.getString("reason") ?? "No reason";
-                // Ban logic...
-            }
-        },
-        {
-            name: "kick",
-            handler: async (client, interaction): Promise<void> => {
-                const user = interaction.options.getUser("user", true);
-                // Kick logic...
-            }
-        }
+        { name: "add", handler: (client, interaction) => cardAdd(interaction) },
+        { name: "delete", handler: (client, interaction) => cardDelete(interaction) },
+        { name: "edit", handler: (client, interaction) => cardEdit(interaction) }
     ]
+});
+```
+
+**With Database Integration**:
+
+```typescript
+import { InteractionContextType } from "discord.js";
+import { SlashCommandBuilder } from "vimcord";
+import { UserSchema, CooldownSchema } from "@db/index";
+
+export default new SlashCommandBuilder({
+    builder: builder =>
+        builder.setName("daily").setDescription("Claim your daily reward").setContexts(InteractionContextType.Guild),
+
+    deferReply: true,
+    metadata: { category: "Economy" },
+
+    async execute(client, interaction): Promise<void> {
+        const userId = interaction.user.id;
+
+        // Check cooldown
+        const cooldown = await CooldownSchema.check(userId, interaction.channel, "daily");
+        if (cooldown?.isActive) {
+            return cooldown.onActiveMessage(interaction, "Daily not ready yet.");
+        }
+
+        // Fetch user data
+        const user = await UserSchema.fetch({ userId }, { balance: 1, dailyStreak: 1 });
+
+        // Update balance and streak
+        await UserSchema.update(
+            { userId },
+            {
+                $inc: { balance: 100, dailyStreak: 1 },
+                $set: { dailyClaimedAt: Date.now() }
+            },
+            { upsert: true }
+        );
+
+        await interaction.editReply(`Claimed daily! Streak: ${(user?.dailyStreak ?? 0) + 1}`);
+    }
+});
+```
+
+**Full Permissions Reference**:
+
+```typescript
+new SlashCommandBuilder({
+    builder: {...},
+    permissions: {
+        // Discord permissions
+        user: [PermissionFlagsBits.ManageMessages],
+        bot: [PermissionFlagsBits.SendMessages],
+
+        // Role-based
+        roles: ["ROLE_ID_1", "ROLE_ID_2"], // User must have any of these
+        roleBlacklist: ["BANNED_ROLE_ID"], // Block users with these roles
+
+        // User-based
+        userWhitelist: ["USER_ID_1"], // Only these users can use
+        userBlacklist: ["BANNED_USER_ID"], // Block these users
+
+        // Context restrictions
+        guildOnly: true, // No DMs
+        guildOwnerOnly: false, // Only server owner
+        botOwnerOnly: false, // Only bot owner
+        botStaffOnly: false // Bot owner + superUsers
+    }
 });
 ```
 
@@ -388,15 +829,44 @@ export default new SlashCommandBuilder({
 
 ```typescript
 import { PrefixCommandBuilder } from "vimcord";
+import { BlacklistedUserSchema } from "@db/index";
 
 export default new PrefixCommandBuilder({
-    name: "ping",
-    aliases: ["p", "latency"],
-    description: "Check bot latency.",
+    name: "blacklist",
+    aliases: ["bl"],
+    description: "Add or remove a user from the blacklist.",
 
-    execute: async (client, message, args): Promise<void> => {
-        const latency = client.ws.ping;
-        await message.reply(`Pong! Latency: ${latency}ms`);
+    metadata: {
+        category: "Staff",
+        examples: ["blacklist add @user --rs reason"]
+    },
+
+    permissions: {
+        guildOnly: true,
+        botStaffOnly: true
+    },
+
+    async execute(client, message, args): Promise<void> {
+        const op = args[0]?.toLowerCase();
+        const userId = message.mentions.users.first()?.id || args[1];
+
+        if (!op || !["add", "remove"].includes(op)) {
+            return message.reply("Please specify: `add` OR `remove`.");
+        }
+
+        if (op === "add") {
+            await BlacklistedUserSchema.create([
+                {
+                    userId,
+                    staffId: message.author.id,
+                    reason: "Manual blacklist"
+                }
+            ]);
+            return message.reply(`Blacklisted <@${userId}>.`);
+        } else {
+            await BlacklistedUserSchema.delete({ userId });
+            return message.reply(`Whitelisted <@${userId}>.`);
+        }
     }
 });
 ```
@@ -404,42 +874,30 @@ export default new PrefixCommandBuilder({
 ### Context Menu Commands
 
 ```typescript
-import { ApplicationCommandType, ContextMenuCommandBuilder } from "discord.js";
-import { ContextCommandBuilder } from "vimcord";
+import { ApplicationCommandType, InteractionContextType, MessageContextMenuCommandInteraction } from "discord.js";
+import { ContextCommandBuilder, BetterModal } from "vimcord";
 
 export default new ContextCommandBuilder({
-    builder: new ContextMenuCommandBuilder().setName("Get Avatar").setType(ApplicationCommandType.User),
+    builder: builder =>
+        builder.setName("Reply").setContexts(InteractionContextType.Guild).setType(ApplicationCommandType.Message),
 
-    execute: async (client, interaction): Promise<void> => {
-        const targetUser = interaction.targetUser;
-        await interaction.reply({
-            content: targetUser.displayAvatarURL({ size: 1024 }),
-            flags: "Ephemeral"
-        });
+    async execute(client, interaction): Promise<void> {
+        // Fetch target message
+        const targetMessage = await interaction.channel?.messages.fetch(interaction.targetId);
+        if (!targetMessage) return;
+
+        // Show modal for input
+        const modal = await new BetterModal({
+            title: "Reply",
+            components: [{ textInput: { label: "Message", required: true, style: "Paragraph" } }]
+        }).showAndAwait(interaction as MessageContextMenuCommandInteraction);
+
+        if (!modal?.values[0]) return;
+
+        await modal.interaction.deferReply({ flags: "Ephemeral" });
+        await targetMessage.reply({ content: modal.values[0] });
+        await modal.interaction.editReply({ content: "Message sent!" });
     }
-});
-```
-
-### Command Configuration
-
-**Permissions**:
-
-```typescript
-new SlashCommandBuilder({
-    builder: {...},
-    permissions: {
-        user: [PermissionFlagsBits.ManageMessages],      // User perms
-        bot: [PermissionFlagsBits.ManageMessages],       // Bot perms
-        roles: ["123456789"],                            // Allowed role IDs
-        userWhitelist: ["123456789"],                    // Only these users
-        userBlacklist: ["987654321"],                    // Block these users
-        roleBlacklist: ["111222333"],                    // Block these roles
-        guildOnly: true,                                 // No DMs
-        guildOwnerOnly: false,                           // Only server owner
-        botOwnerOnly: false,                             // Only bot owner
-        botStaffOnly: false                              // Bot staff/owner only
-    },
-    // ...
 });
 ```
 
@@ -573,89 +1031,404 @@ import { createBot } from "./bot";
 const client = createBot();
 
 // useDatabase must be called before client.start()
-await client.useDatabase(new MongoDatabase(client));
+client.useDatabase(new MongoDatabase(client));
 await client.start();
 ```
 
-**2. Define Schemas** (`src/db/schemas/user.schema.ts`):
+### createMongoSchema
+
+Creates a typed MongoDB schema with built-in CRUD methods:
 
 ```typescript
-import { createMongoPlugin, createMongoSchema } from "vimcord";
+import { createMongoSchema } from "vimcord";
 
-export const UserSchema = createMongoSchema("Users", {
-    userId: { type: String, required: true, unique: true },
-    username: String,
+// Define interface for type safety
+export interface IUser {
+    userId: string;
+    username: string;
+    balance: number;
+    experience: number;
+    isPremium: boolean;
+    favoriteCardIds: string[];
+    lastActive: Date;
+    createdAt: number;
+}
+
+export const UserSchema = createMongoSchema<IUser>("Users", {
+    // Required unique field
+    userId: { type: String, unique: true, required: true },
+
+    // Required field
+    username: { type: String, required: true },
+
+    // Field with default value
     balance: { type: Number, default: 0 },
-    experience: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+
+    // Indexed field for faster queries
+    experience: { type: Number, default: 0, index: true },
+
+    // Boolean with default
+    isPremium: { type: Boolean, default: false },
+
+    // Array type
+    favoriteCardIds: { type: [String], default: [] },
+
+    // Date with function default
+    lastActive: { type: Date, default: () => new Date() },
+
+    // Number with function default
+    createdAt: { type: Number, default: Date.now }
 });
-
-// Create a plugin (reusable logic)
-export const SoftDeletePlugin = createMongoPlugin(builder => {
-    builder.schema.add({
-        deletedAt: { type: Date, default: null }
-    });
-
-    builder.extend({
-        async softDelete(filter: Record<string, unknown>) {
-            return this.update(filter, { deletedAt: new Date() });
-        }
-    });
-});
-
-// Apply plugin to schema
-UserSchema.use(SoftDeletePlugin);
 ```
 
-**3. CRUD Operations**:
+#### Field Options Reference
+
+| Option     | Type      | Description                |
+| ---------- | --------- | -------------------------- | --------------------------------- | ---- | ------- | ----------------------------------- |
+| `type`     | `String   | Number                     | Boolean                           | Date | Object` | Field type. Use `[Type]` for arrays |
+| `required` | `boolean` | Field must be present      |
+| `unique`   | `boolean` | Creates unique index       |
+| `default`  | `any      | () => any`                 | Default value or factory function |
+| `index`    | `boolean` | Creates single-field index |
+
+#### Nested Object Fields
 
 ```typescript
-import { UserSchema } from "@db/schemas/user.schema";
+export interface IUserMetrics {
+    userId: string;
+    // Nested economy metrics
+    mingcoins: { spent: number; received: number };
+    mingkis: { spent: number; received: number };
+    date: Date;
+}
 
-// Create
-const newUser = await UserSchema.create([
-    {
-        userId: "123456",
-        username: "JohnDoe",
-        balance: 100
-    }
+export const UserMetricsSchema = createMongoSchema<IUserMetrics>("UserMetrics", {
+    userId: { type: String, unique: true, required: true },
+    // Nested objects with their own field definitions
+    mingcoins: {
+        spent: { type: Number, default: 0 },
+        received: { type: Number, default: 0 }
+    },
+    mingkis: {
+        spent: { type: Number, default: 0 },
+        received: { type: Number, default: 0 }
+    },
+    date: { type: Date, required: true, index: true }
+});
+```
+
+### Schema Indexing
+
+Add compound and special indexes after schema creation:
+
+```typescript
+import { createMongoSchema } from "vimcord";
+
+export const GuildSchema = createMongoSchema<IGuild>("Guilds", {
+    guildId: { type: String, unique: true, required: true },
+    prefix: { type: String, default: null }
+});
+
+// Compound unique index
+GuildSchema.schema.index({ guildId: 1, prefix: 1 }, { unique: true });
+
+// TTL index (auto-delete after 5 minutes)
+CooldownSchema.schema.index({ endsAt: 1 }, { expireAfterSeconds: 300 });
+
+// Compound index for queries
+AlbumCardSchema.schema.index({ userId: 1, claimedAt: -1 });
+AlbumCardSchema.schema.index({ userId: 1, cardId: 1 }, { unique: true });
+```
+
+### CRUD Operations
+
+#### Create
+
+```typescript
+// Single document
+await UserSchema.create([{ userId: "123", username: "John" }]);
+
+// With session (transaction)
+await UserSchema.create([{ userId: "123" }], { session });
+
+// Multiple documents
+await UserSchema.create([
+    { userId: "1", username: "User1" },
+    { userId: "2", username: "User2" }
+]);
+```
+
+#### Read
+
+```typescript
+// Fetch single document
+const user = await UserSchema.fetch({ userId: "123" });
+
+// With projection (only specific fields)
+const user = await UserSchema.fetch({ userId: "123" }, { balance: 1, experience: 1 });
+
+// With options
+const user = await UserSchema.fetch(
+    { userId: "123" },
+    { balance: 1 },
+    { upsert: true } // Create if doesn't exist
+);
+
+// Fetch all matching documents
+const users = await UserSchema.fetchAll({ isPremium: true });
+
+// With lean option (faster, returns plain objects)
+const users = await UserSchema.fetchAll({}, null, { lean: true });
+
+// With limit and sort
+const topUsers = await UserSchema.fetchAll({ balance: { $gt: 0 } }, null, { limit: 10, sort: { balance: -1 } });
+
+// Check existence
+const exists = await UserSchema.exists({ userId: "123" });
+
+// Get distinct values
+const groups = await CardSchema.distinct("group", { released: true });
+```
+
+#### Update
+
+```typescript
+// Update single document
+await UserSchema.update({ userId: "123" }, { $inc: { balance: 100 } });
+
+// With options
+await UserSchema.update(
+    { userId: "123" },
+    { $set: { lastActive: new Date() } },
+    { upsert: true, new: true } // Create if missing, return updated
+);
+
+// Update multiple documents
+await CardSchema.updateAll({ released: false }, { $set: { released: true } });
+
+// With session
+await UserSchema.update({ userId: "123" }, { $inc: { balance: -50 } }, { session });
+```
+
+#### Delete
+
+```typescript
+// Delete single document
+await UserSchema.delete({ userId: "123" });
+
+// Delete all matching documents
+await CooldownSchema.deleteAll({ endsAt: { $lt: new Date() } });
+```
+
+### Aggregation
+
+```typescript
+import { PipelineStage } from "mongoose";
+
+// Simple aggregation
+const topUsers = await UserSchema.aggregate([
+    { $match: { balance: { $gt: 0 } } },
+    { $sort: { balance: -1 } },
+    { $limit: 10 }
 ]);
 
-// Read
-const user = await UserSchema.fetch({ userId: "123456" });
-const users = await UserSchema.fetchAll({ balance: { $gt: 0 } });
+// Complex pipeline with types
+const pipeline: PipelineStage[] = [{ $match: { tier: CardTier.Public, released: true } }, { $sample: { size: 3 } }];
+const cards = await CardSchema.aggregate<ICard>(pipeline);
 
-// Update
-await UserSchema.upsert({ userId: "123456" }, { $inc: { balance: 50 } });
+// With session
+const results = await CardSchema.aggregate(pipeline, { session });
+```
 
-// Delete
-await UserSchema.delete({ userId: "123456" });
+### extend() - Custom Schema Methods
 
-// Transactions
-await UserSchema.useTransaction(async (session, model) => {
-    await model.updateOne({ userId: "123" }, { $inc: { balance: -100 } }, { session });
-    await model.updateOne({ userId: "456" }, { $inc: { balance: 100 } }, { session });
+Add custom methods to schemas for reusable business logic:
+
+```typescript
+import { createMongoSchema, Vimcord } from "vimcord";
+import { ClientSession } from "mongoose";
+
+export const UserSchema = createMongoSchema<IUser>("Users", {
+    userId: { type: String, unique: true, required: true },
+    balance: { type: Number, default: 0 },
+    experience: { type: Number, default: 0 },
+    isPremium: { type: Boolean, default: false },
+    premiumSyncedAt: { type: Number, default: null }
+}).extend({ modifyBalance, addExperience, getLeaderboard, resetPremiumStatus });
+
+// Method to modify balance with metrics tracking
+async function modifyBalance(userId: string, query: { balance?: number }) {
+    if (!Object.values(query).some(Boolean)) return;
+
+    await UserSchema.update({ userId }, { $inc: query });
+}
+
+// Method returning typed data
+async function getLeaderboard(limit: number = 10) {
+    return this.aggregate([{ $sort: { experience: -1 } }, { $limit: limit }]);
+}
+
+// Method with client parameter for Discord API access
+async function syncPremiumStatus(client: Vimcord<true>, userId: string) {
+    const userData = await UserSchema.fetch({ userId }, { isPremium: 1, premiumSyncedAt: 1 });
+    if (!userData) return;
+
+    // Access Discord API through client
+    const guild = await client.fetchGuild(client.config.staff.guild.id);
+    const member = guild?.members.cache.get(userId);
+
+    const isPremium = member?.roles.cache.has("ROLE_ID");
+    await UserSchema.update({ userId }, { isPremium, premiumSyncedAt: Date.now() });
+}
+
+// Simple update method
+async function resetPremiumStatus(userId: string) {
+    return await UserSchema.update({ userId }, { isPremium: false }, { new: true });
+}
+
+// Usage
+await UserSchema.modifyBalance("123", { balance: 100 });
+const topUsers = await UserSchema.getLeaderboard(5);
+await UserSchema.syncPremiumStatus(client, "123");
+```
+
+### Transactions
+
+Use transactions for atomic operations across multiple schemas:
+
+```typescript
+// Automatic session management
+await UserSchema.useTransaction(async session => {
+    // Deduct from sender
+    await UserSchema.update({ userId: senderId }, { $inc: { balance: -amount } }, { session });
+
+    // Add to recipient
+    await UserSchema.update({ userId: recipientId }, { $inc: { balance: amount } }, { session });
+
+    // Log the trade
+    await TradeSchema.create(
+        [
+            {
+                senderId,
+                recipientId,
+                amount
+            }
+        ],
+        { session }
+    );
+});
+
+// Multi-schema transaction
+await UserSchema.useTransaction(async session => {
+    await UserSchema.update({ userId }, { $inc: { balance: -price } }, { session });
+    await ScrapbookCardSchema.add(userId, [{ cardId, quantity: 1 }], undefined, { session });
+    await TransactionSchema.create([{ userId, cardId }], { session });
 });
 ```
 
-### Schema Extension
+### execute() - Direct Model Access
 
-Add custom methods to schemas:
+For operations not covered by built-in methods:
 
 ```typescript
-UserSchema.extend({
-    async getLeaderboard(limit: number = 10) {
-        return this.aggregate([{ $sort: { experience: -1 } }, { $limit: limit }]);
-    },
-
-    async addExperience(userId: string, amount: number) {
-        return this.upsert({ userId }, { $inc: { experience: amount }, $set: { updatedAt: new Date() } });
-    }
+// Bulk write operations
+await UserCardMetricSchema.execute(async model => {
+    await model.bulkWrite(
+        cardIds.map(cardId => ({
+            insertOne: { document: { userId, cardId, type: CardMetricType.Claimed } }
+        }))
+    );
 });
 
-// Usage
-const topUsers = await UserSchema.getLeaderboard(5);
+// Complex updates
+await AlbumCardSchema.execute(async model => {
+    await model.bulkWrite(
+        query.map(q => ({
+            updateOne: {
+                filter: { userId, cardId: q.cardId },
+                update: { $addToSet: { prints: { $each: q.prints } } },
+                upsert: true
+            }
+        }))
+    );
+});
+```
+
+### Utility Methods
+
+```typescript
+// Generate unique hex ID
+const transactionId = await DailyMenuTransactionSchema.createHexId(12, "transactionId");
+
+// Upsert pattern (update or insert)
+await UserSchema.update({ userId: "123" }, { $set: { lastActive: new Date() } }, { upsert: true });
+```
+
+### Full Schema Example
+
+```typescript
+import { createMongoSchema } from "vimcord";
+import { PipelineStage, FilterQuery, ProjectionFields } from "mongoose";
+
+export interface ICard {
+    cardId: string;
+    name: string;
+    group: string;
+    rarity: number | null;
+    type: CardType;
+    tier: CardTier;
+    imageUrl: string;
+    released: boolean;
+    locked: boolean;
+    globalPrint: number | null;
+    createdAt: number;
+}
+
+export const CardSchema = createMongoSchema<ICard>("Cards", {
+    cardId: { type: String, unique: true, required: true },
+    name: { type: String, required: true },
+    group: { type: String, required: true },
+    rarity: { type: Number, default: null, index: true },
+    type: { type: Number, required: true, index: true },
+    tier: { type: Number, default: CardTier.Public, index: true },
+    imageUrl: { type: String, required: true },
+    released: { type: Boolean, default: false, index: true },
+    locked: { type: Boolean, default: true, index: true },
+    globalPrint: { type: Number, default: null },
+    createdAt: { type: Number, default: Date.now }
+}).extend({ sampleRandom, lookup });
+
+// Compound indexes
+CardSchema.schema.index({ type: 1, rarity: 1, tier: 1, released: 1 });
+
+// Extended method: Random card sampling
+async function sampleRandom(quantity: number, options: { type?: CardType[] } = {}) {
+    const pipeline: PipelineStage[] = [
+        {
+            $match: {
+                tier: CardTier.Public,
+                type: { $in: options.type ?? [CardType.Regular] },
+                released: true,
+                locked: false
+            }
+        },
+        { $sample: { size: quantity } }
+    ];
+
+    return await CardSchema.aggregate<ICard>(pipeline);
+}
+
+// Extended method: Card lookup with options
+async function lookup(
+    filter: FilterQuery<ICard> = {},
+    options: { projection?: ProjectionFields<ICard>; limit?: number } = {}
+) {
+    const pipeline: PipelineStage[] = [{ $match: filter }];
+    if (options.projection) pipeline.push({ $project: options.projection });
+    if (options.limit) pipeline.push({ $limit: options.limit });
+
+    return await CardSchema.aggregate<ICard>(pipeline);
+}
 ```
 
 ---
@@ -882,6 +1655,201 @@ stopLoader("Connected successfully!");
 logger.table("Stats", {
     users: 150,
     revenue: "$420.69"
+});
+```
+
+---
+
+## Scheduled Jobs
+
+For recurring tasks, use a cron-based job system:
+
+### Base Job Classes
+
+```typescript
+// src/jobs/_BaseCronJob.ts
+import { schedule, ScheduledTask } from "node-cron";
+
+export abstract class _BaseCronJob {
+    protected task: ScheduledTask | null = null;
+    private static instances = new Map<any, any>();
+
+    static getInstance<T extends _BaseCronJob>(this: new (...args: any[]) => T): T {
+        let instance = _BaseCronJob.instances.get(this);
+
+        if (!instance) {
+            instance = new this();
+        }
+
+        return instance as T;
+    }
+
+    constructor(
+        private interval: string,
+        private immediate?: boolean
+    ) {
+        _BaseCronJob.instances.set(this.constructor, this);
+        this.start();
+    }
+
+    abstract execute(): Promise<any>;
+
+    async start(): Promise<void> {
+        if (this.task) {
+            this.task.start();
+            return;
+        }
+
+        this.task = schedule(this.interval, () => this.execute(), { noOverlap: true });
+
+        if (this.immediate) {
+            await this.execute();
+        }
+    }
+
+    stop(): void {
+        this.task?.stop();
+    }
+}
+```
+
+### Implementing a Job
+
+```typescript
+// src/jobs/Backups.job.ts
+import { BackupManager } from "@/utils/app/BackupManager";
+import { logger } from "@/utils/logger";
+import { _BaseCronJob } from "./_BaseCronJob";
+
+export class Backups extends _BaseCronJob {
+    constructor() {
+        // Run every 6 hours: "0 0 */6 * * *"
+        super("0 0 */6 * * *", false);
+        logger.job("Backups", "Initialized");
+    }
+
+    async execute(): Promise<void> {
+        await BackupManager.create();
+    }
+}
+```
+
+### Job Initialization
+
+```typescript
+// src/jobs/index.ts
+import { Vimcord } from "vimcord";
+import { Backups } from "./Backups.job";
+import { CooldownReminders } from "./CooldownReminders.job";
+import { DailyMenuRotator } from "./DailyMenuRotator.job";
+
+export async function initializeJobs(client: Vimcord): Promise<void> {
+    new Backups();
+    new CooldownReminders(client);
+    new DailyMenuRotator();
+}
+```
+
+### Cron Schedule Reference
+
+| Pattern         | Description       |
+| --------------- | ----------------- |
+| `* * * * * *`   | Every second      |
+| `0 * * * * *`   | Every hour        |
+| `0 0 */6 * * *` | Every 6 hours     |
+| `0 0 0 * * *`   | Daily at midnight |
+| `0 30 4 * * *`  | Daily at 4:30 AM  |
+
+Format: `second minute hour day month weekday`
+
+---
+
+## Feature Classes
+
+For complex business logic that spans multiple commands, use feature classes:
+
+```typescript
+// src/features/PlayerTradeManager.ts
+import { User } from "discord.js";
+import { Vimcord } from "vimcord";
+import { UserSchema, ScrapbookCardSchema } from "@db/index";
+
+export class PlayerTrade {
+    sender: User;
+    recipient: User;
+    senderOffer: TradeOffer;
+    recipientOffer: TradeOffer;
+
+    constructor(sender: User, recipient: User) {
+        this.sender = sender;
+        this.recipient = recipient;
+        this.senderOffer = PlayerTrade.createTradeOffer();
+        this.recipientOffer = PlayerTrade.createTradeOffer();
+    }
+
+    static createTradeOffer(): TradeOffer {
+        return { cards: [], mingcoins: 0 };
+    }
+
+    async isEligible(client: Vimcord): Promise<{ success: boolean; failReason?: string }> {
+        const userData = await UserSchema.fetchAll({
+            userId: { $in: [this.sender.id, this.recipient.id] }
+        });
+
+        if (userData.length < 2) {
+            return { success: false, failReason: "Both users must be registered." };
+        }
+
+        return { success: true };
+    }
+
+    async execute(): Promise<{ success: boolean; failReason?: string }> {
+        // Validate offers
+        // Apply trade with transaction
+        await UserSchema.useTransaction(async session => {
+            await UserSchema.update(
+                { userId: this.sender.id },
+                { $inc: { balance: -this.senderOffer.mingcoins } },
+                { session }
+            );
+            await UserSchema.update(
+                { userId: this.recipient.id },
+                { $inc: { balance: this.senderOffer.mingcoins } },
+                { session }
+            );
+        });
+
+        return { success: true };
+    }
+}
+```
+
+### Using Feature Classes in Commands
+
+```typescript
+// In a command file
+import { PlayerTrade } from "@/features/PlayerTradeManager";
+
+export default new SlashCommandBuilder({
+    builder: builder => builder.setName("trade").setDescription("Trade with another player"),
+
+    async execute(client, interaction): Promise<void> {
+        const targetUser = interaction.options.getUser("user", true);
+
+        const trade = new PlayerTrade(interaction.user, targetUser);
+
+        const eligibility = await trade.isEligible(client);
+        if (!eligibility.success) {
+            return interaction.reply({ content: eligibility.failReason, flags: "Ephemeral" });
+        }
+
+        // ... trade UI logic
+
+        const result = await trade.execute();
+        if (result.failReason) {
+            return interaction.reply({ content: result.failReason, flags: "Ephemeral" });
+        }
+    }
 });
 ```
 
@@ -1316,17 +2284,26 @@ export default new SlashCommandBuilder({
 // Core
 import { createClient, Vimcord } from "vimcord";
 
+// Configuration factories
+import { defineClientOptions, defineVimcordFeatures, defineGlobalToolsConfig } from "vimcord";
+
 // Builders
 import { SlashCommandBuilder, PrefixCommandBuilder, ContextCommandBuilder, EventBuilder } from "vimcord";
 
 // Tools
 import { BetterEmbed, Paginator, Prompt, BetterModal, Logger, dynaSend } from "vimcord";
 
+// Collectors & Components
+import { BetterCollector, BetterContainer, CollectorTimeoutType, PaginationTimeoutType } from "vimcord";
+
 // Database
-import { MongoDatabase, createMongoSchema, createMongoPlugin } from "vimcord";
+import { MongoDatabase, createMongoSchema } from "vimcord";
 
 // Types
-import { RateLimitScope, MissingPermissionReason, CommandType } from "vimcord";
+import { RateLimitScope, MissingPermissionReason, CommandType, StatusType, SendMethod } from "vimcord";
+
+// Utilities
+import { fetchMember, fetchChannel, __zero } from "vimcord";
 ```
 
 ### Common Types
@@ -1349,6 +2326,18 @@ PromptResolveType.DisableComponents; // Disable buttons after response
 PromptResolveType.ClearComponents; // Remove buttons after response
 PromptResolveType.DeleteOnConfirm; // Delete message on confirm
 PromptResolveType.DeleteOnReject; // Delete message on reject
+
+// Collector timeout types
+CollectorTimeoutType.DisableComponents;
+CollectorTimeoutType.ClearComponents;
+CollectorTimeoutType.DeleteMessage;
+CollectorTimeoutType.DoNothing;
+
+// Status types
+StatusType.Online;
+StatusType.Idle;
+StatusType.DND;
+StatusType.Invisible;
 ```
 
 ---
