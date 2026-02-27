@@ -13,7 +13,7 @@ async function main() {
     await bot.start(() => {
         bot.status.set({
             production: {
-                activity: { name: "Check out our server!", type: ActivityType.Streaming, status: StatusType.Online }
+                activity: { name: "Check out our server!", type: ActivityType.Custom, status: StatusType.Online }
             },
             development: {
                 activity: { name: "Testing new features...", type: ActivityType.Custom, status: StatusType.DND }
