@@ -3,21 +3,15 @@ import { MongoDatabase, StatusType } from "vimcord";
 import { createBot } from "./bot";
 
 async function main() {
-    const client = createBot();
+    const bot = createBot();
+    bot.useEnv();
 
-    client.useEnv();
-
-    client.configure("app", {
-        name: "My Amazing Bot",
-        verbose: process.argv.includes("--verbose")
-    });
-
-    if (client.$devMode ? process.env.MONGO_URI_DEV : process.env.MONGO_URI) {
-        await client.useDatabase(new MongoDatabase(client));
+    if (bot.$devMode ? process.env.MONGO_URI_DEV : process.env.MONGO_URI) {
+        await bot.useDatabase(new MongoDatabase(bot));
     }
 
-    await client.start(() => {
-        client.status.set({
+    await bot.start(() => {
+        bot.status.set({
             production: {
                 activity: { name: "Check out our server!", type: ActivityType.Streaming, status: StatusType.Online }
             },

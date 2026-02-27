@@ -2,7 +2,8 @@ import { GatewayIntentBits } from "discord.js";
 import { createClient, Vimcord } from "vimcord";
 
 export function createBot(): Vimcord {
-    return createClient(
+    // Create a new Vimcord client
+    const bot = createClient(
         {
             intents: [
                 GatewayIntentBits.Guilds,
@@ -26,4 +27,12 @@ export function createBot(): Vimcord {
             }
         }
     );
+
+    // Configure the app
+    bot.configure("app", {
+        name: "My Amazing Bot",
+        verbose: process.argv.includes("--verbose")
+    });
+
+    return bot;
 }

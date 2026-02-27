@@ -1,12 +1,12 @@
 ---
 name: vimcord
 description: >
-  Build, scaffold, migrate, and extend Discord bots using TypeScript and the Vimcord framework (a discord.js wrapper).
-  Use this skill whenever the user is working on a Discord bot — including creating new bots from scratch, adding commands
-  or events to existing bots, migrating from plain discord.js to Vimcord, building advanced features like economy systems,
-  moderation tools, scheduled jobs, or interactive UIs, or when they paste any Vimcord/discord.js code and ask for help.
-  Always load this skill before writing any bot code, even for "simple" changes — the patterns here are strict and deviation
-  leads to slop that won't type-check or integrate correctly.
+    Build, scaffold, migrate, and extend Discord bots using TypeScript and the Vimcord framework (a discord.js wrapper).
+    Use this skill whenever the user is working on a Discord bot — including creating new bots from scratch, adding commands
+    or events to existing bots, migrating from plain discord.js to Vimcord, building advanced features like economy systems,
+    moderation tools, scheduled jobs, or interactive UIs, or when they paste any Vimcord/discord.js code and ask for help.
+    Always load this skill before writing any bot code, even for "simple" changes — the patterns here are strict and deviation
+    leads to slop that won't type-check or integrate correctly.
 ---
 
 # Vimcord Skill
@@ -36,20 +36,20 @@ These apply to **every line of code** you write. No exceptions.
 
 ## Path Aliases (always use these)
 
-| Alias | Resolves To |
-|-------|-------------|
-| `@/*` | `./src/*` |
-| `@commands/*` | `./src/commands/*` |
-| `@slashCommands/*` | `./src/commands/slash/*` |
-| `@prefixCommands/*` | `./src/commands/prefix/*` |
-| `@contextCommands/*` | `./src/commands/context/*` |
-| `@events/*` | `./src/events/*` |
-| `@jobs/*` | `./src/jobs/*` |
-| `@db/*` | `./src/db/*` (always include subpath, e.g. `@db/index`) |
-| `@features/*` | `./src/features/*` |
-| `@utils/*` | `./src/utils/*` |
-| `@constants/*` | `./src/constants/*` |
-| `@ctypes/*` | `./src/types/*` |
+| Alias                | Resolves To                                             |
+| -------------------- | ------------------------------------------------------- |
+| `@/*`                | `./src/*`                                               |
+| `@commands/*`        | `./src/commands/*`                                      |
+| `@slashCommands/*`   | `./src/commands/slash/*`                                |
+| `@prefixCommands/*`  | `./src/commands/prefix/*`                               |
+| `@contextCommands/*` | `./src/commands/context/*`                              |
+| `@events/*`          | `./src/events/*`                                        |
+| `@jobs/*`            | `./src/jobs/*`                                          |
+| `@db/*`              | `./src/db/*` (always include subpath, e.g. `@db/index`) |
+| `@features/*`        | `./src/features/*`                                      |
+| `@utils/*`           | `./src/utils/*`                                         |
+| `@constants/*`       | `./src/constants/*`                                     |
+| `@ctypes/*`          | `./src/types/*`                                         |
 
 ---
 
@@ -98,8 +98,7 @@ import { InteractionContextType } from "discord.js";
 import { SlashCommandBuilder } from "vimcord";
 
 export default new SlashCommandBuilder({
-    builder: builder =>
-        builder.setName("ping").setDescription("Check latency").setContexts(InteractionContextType.Guild),
+    builder: builder => builder.setName("ping").setDescription("Check latency").setContexts(InteractionContextType.Guild),
 
     deferReply: true,
     metadata: { category: "General" },
@@ -135,13 +134,13 @@ import { createMongoSchema } from "vimcord";
 export interface IUser {
     userId: string;
     balance: number;
-    createdAt: number;
+    createdAt: Date;
 }
 
 export const UserSchema = createMongoSchema<IUser>("Users", {
     userId: { type: String, unique: true, required: true, index: true },
     balance: { type: Number, default: 0 },
-    createdAt: { type: Number, default: Date.now }
+    createdAt: { type: Date, default: () => new Date() }
 });
 ```
 
@@ -151,18 +150,18 @@ export const UserSchema = createMongoSchema<IUser>("Users", {
 
 For more patterns and API details, read the relevant reference file **before writing code**:
 
-| Task | Reference |
-|------|-----------|
-| Scaffolding a new bot from scratch | `docs/vimcord/scaffolding.md` |
-| Slash / prefix / context commands (full API) | `docs/vimcord/commands.md` |
-| Events, conditions, priorities, EventManager | `docs/vimcord/events.md` |
-| MongoDB schemas, CRUD, transactions, plugins | `docs/vimcord/database.md` |
-| BetterEmbed, Paginator, Prompt, Modal, BetterCollector, BetterContainer | `docs/vimcord/ui.md` |
-| Fetch helpers, mention parsing, utilities | `docs/vimcord/utilities.md` |
-| Scheduled jobs (cron) | `docs/vimcord/jobs.md` |
-| Feature classes (complex business logic) | `docs/vimcord/features.md` |
-| Migrating from plain discord.js | `docs/vimcord/migration.md` |
-| Client config, status, logging, CLI, ToolsConfig | `docs/vimcord/client.md` |
+| Task                                                                    | Reference                        |
+| ----------------------------------------------------------------------- | -------------------------------- |
+| Scaffolding a new bot from scratch                                      | `.skills/vimcord/scaffolding.md` |
+| Slash / prefix / context commands (full API)                            | `.skills/vimcord/commands.md`    |
+| Events, conditions, priorities, EventManager                            | `.skills/vimcord/events.md`      |
+| MongoDB schemas, CRUD, transactions, plugins                            | `.skills/vimcord/database.md`    |
+| BetterEmbed, Paginator, Prompt, Modal, BetterCollector, BetterContainer | `.skills/vimcord/ui.md`          |
+| Fetch helpers, mention parsing, utilities                               | `.skills/vimcord/utilities.md`   |
+| Scheduled jobs (cron)                                                   | `.skills/vimcord/jobs.md`        |
+| Feature classes (complex business logic)                                | `.skills/vimcord/features.md`    |
+| Migrating from plain discord.js                                         | `.skills/vimcord/migration.md`   |
+| Client config, status, logging, CLI, ToolsConfig                        | `.skills/vimcord/client.md`      |
 
 **Always read the reference file before implementing anything in its domain.** These contain correct API signatures, working examples, and gotchas that prevent slop.
 

@@ -31,7 +31,7 @@ Set `"name"` to the lowercase-kebab-case version of the bot name:
 { "name": "orbit" }
 ```
 
-**2b. Update `src/index.ts`**
+**2b. Update `src/bot.ts`**
 Set the bot name in the client app configuration:
 
 ```typescript
