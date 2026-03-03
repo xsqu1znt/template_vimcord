@@ -41,22 +41,7 @@
         "skipLibCheck": true,
 
         "paths": {
-            "@/*": ["./src/*"],
-
-            "@commands/*": ["./src/commands/*"],
-            "@slashCommands/*": ["./src/commands/slash/*"],
-            "@prefixCommands/*": ["./src/commands/prefix/*"],
-            "@contextCommands/*": ["./src/commands/context/*"],
-
-            "@events/*": ["./src/events/*"],
-            "@jobs/*": ["./src/jobs/*"],
-
-            "@db/*": ["./src/db/*"],
-            "@features/*": ["./src/features/*"],
-            "@utils/*": ["./src/utils/*"],
-
-            "@constants/*": ["./src/constants"],
-            "@ctypes/*": ["./src/types/*"]
+            "@/*": ["./src/*"]
         }
     }
 }
